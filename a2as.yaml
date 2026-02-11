@@ -1,0 +1,645 @@
+manifest:
+  version: "0.1.3"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: bhancockio/ai_agent_bake_off_ep_2
+    source: https://github.com/bhancockio/ai_agent_bake_off_ep_2
+    branch: main
+    commit: "f959bdb5"
+    scope: [agents/advisors_snapshot_agent/advisors_snapshot_agent/agent.py, agents/advisors_snapshot_agent/advisors_snapshot_agent/cymbal_agent_wrapper.py,
+      agents/chat/chat/agent.py, agents/chat/chat/cymbal_agent_wrapper.py, agents/goals_snapshot_agent/goals_snapshot_agent/agent.py,
+      agents/goals_snapshot_agent/goals_snapshot_agent/cymbal_agent_wrapper.py, agents/perks_snapshot_agent/perks_snapshot_agent/agent.py,
+      agents/perks_snapshot_agent/perks_snapshot_agent/cymbal_agent_wrapper.py, agents/portfolio_snapshot_agent/portfolio_snapshot_agent/agent.py,
+      agents/portfolio_snapshot_agent/portfolio_snapshot_agent/cymbal_agent_wrapper.py, agents/spending_snapshot_agent/spending_snapshot_agent/agent.py,
+      agents/spending_snapshot_agent/spending_snapshot_agent/cymbal_agent_wrapper.py, refs/a2a_friend_scheduling/host_agent_adk/host/agent.py,
+      refs/a2a_friend_scheduling/host_agent_adk/host/pickleball_tools.py, refs/a2a_friend_scheduling/host_agent_adk/host/remote_agent_connection.py,
+      refs/a2a_friend_scheduling/kaitlynn_agent_langgraph/app/agent.py, refs/a2a_friend_scheduling/karley_agent_adk/__main__.py,
+      refs/a2a_friend_scheduling/karley_agent_adk/agent.py]
+  issued:
+    by: A2AS.org
+    at: '2026-02-11T16:33:44Z'
+    url: https://a2as.org/certified/agents/bhancockio/ai_agent_bake_off_ep_2
+  signatures:
+    digest: sha256:uiR5KezriqqHJ1ZwOzvc_uzcnWVh0ocokaOUWmsnjaQ
+    key: ed25519:DRYBwzKiBzhLgxmeOuBMYgS3Ro_9mqOsHCGvIvfFcn0
+    sig: ed25519:Iq33vLyUxjPXgiZMuKiJCo79WvD_necGYVY_Yi7fh7haL0hrLcYCOq5uAIRjXLWLLBhghFd_-rF40oLLWcbhAw
+
+agents:
+  adk_agent:
+    type: instance
+    models: [gemini-2.5-flash-preview-04-17]
+    tools: [send_message, book_pickleball_court, list_court_availabilities]
+    params:
+      name: Host_Agent
+      instruction: self.root_instruction
+      description: This Host agent orchestrates scheduling pickleball with friends.
+      function: create_agent
+  advisors_agent:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [agent_tool]
+    params:
+      name: advisors_specialist
+      description: Specialist agent for financial advisory services, expert consultations, and professional guidance
+      instruction: [You are a financial advisory services specialist at Cymbal Bank. Your role is to answer any questions,
+        'made by the user about financial advisory services, expert consultations, and professional guidance.', You are a
+          proxy between the user and the Cymbal bank services., '**Your Process:**', '1. **Understand the Request**: Analyze
+          the user''s advisory-related query', '2. **Gather Information**: Use the cymbal_agent tool to retrieve user profile,
+          financial situation, and advisory service options', '3. **Ask Follow-up Questions**: If you need more details from
+          the user (financial goals, risk tolerance, service preferences), ask clarifying questions', '4. **Multiple Queries**:
+          Make additional calls to Cymbal services as needed to get complete advisory information', '5. **Provide Guidance**:
+          Deliver comprehensive advisory service recommendations and next steps', Use the cymbal_agent tool to gather advisory
+          service data and provide detailed guidance. Ask the user for clarification if needed.]
+      output_key: advisors_response
+  advisors_snapshot_workflow:
+    type: instance
+    params:
+      name: Advisors_snapshot_pipeline
+      description: Executes a pre-decided pipeline. It retrieves advisor data and meeting data , then generates structured  insights.
+      sub_agents: [retriever_agent, formatting_agent]
+  agent.create_agent.1:
+    type: factory
+    models: [gemini-2.5-flash-preview-04-17]
+    tools: [get_availability]
+    params:
+      name: Karley_Agent
+      instruction: ['**Role:** You are Karley''s personal scheduling assistant.', Your sole responsibility is to manage her
+          calendar and respond to inquiries, about her availability for pickleball., '**Core Directives:**', '*   **Check
+          Availability:** Use the `get_karley_availability` tool to determine', if Karley is free on a requested date or over
+          a range of dates., The tool requires a `start_date` and `end_date`. If the user only provides, 'a single date, use
+          that date for both the start and end.', '*   **Polite and Concise:** Always be polite and to the point in your responses.',
+        '*   **Stick to Your Role:** Do not engage in any conversation outside of scheduling.', 'If asked other questions,
+          politely state that you can only help with scheduling.']
+      function: create_agent
+      instance: agent.create_agent
+  chart_agent:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [agent_tool]
+    params:
+      name: spending_chart_agent
+      description: Create a chart of the users spending
+      instruction: ['You are an expert chart architect. Using the spending data from the ''spending_data'' state key, create
+          a chart of the users spending.']
+      output_key: spending_chart
+  chat_orchestrator:
+    type: instance
+    models: [gemini-2.5-flash]
+    params:
+      name: chat_orchestrator
+      description: Intelligent banking assistant that routes queries to specialized domain experts
+      instruction: [You are an intelligent banking assistant orchestrator for Cymbal Bank., '**YOUR ROLE:**', Route the user's
+          query to the appropriate specialist agent based on the current topic from the session state., '**TOPIC-BASED DELEGATION:**',
+        'Based on the topic "{topic}", delegate to the appropriate specialist agent:', '- **spending** → Delegate to spending_agent',
+        '- **goals** → Delegate to goals_agent', '- **portfolio** → Delegate to portfolio_agent', '- **perks** → Delegate
+          to perks_agent', '- **advisors** → Delegate to advisors_agent', 'Once you have delegated the task, the sub agent
+          needs to answer the user''s query.']
+      output_key: final_response
+      sub_agents: [spending_agent, goals_agent, portfolio_agent, perks_agent, advisors_agent]
+  formatting_agent.0:
+    type: instance
+    models: [gemini-2.5-flash]
+    params:
+      name: Advisors_formatter
+      description: Analyzes user's advisor and meeting data and generates structured summary
+      instruction: ['You are an expert financial analyst. Using the user meeting data, analyst data and user profile from
+          the ''Advisors_data'' state key,', analyze the information and provide structured insights., '**Your Task:**', '1.
+          **Your Meetings**: List the user''s scheduled meetings (format: "Date - Time - Advisor - Purpose")', '2. **Your
+          Advisors**: List of your bank''s advisors with availability sorted by advisor_type', '**CRITICAL CONSTRAINTS:**',
+        '- You must return a structured JSON response that matches the AdvisorsSummary schema exactly']
+      output_schema: AdvisorsSummary
+      output_key: Advisors_summary
+      instance: formatting_agent
+  formatting_agent.1:
+    type: instance
+    models: [gemini-2.5-flash]
+    params:
+      name: perks_formatter
+      description: Analyzes user's benefits data and generates structured financial insights
+      instruction: ['You are an expert financial analyst. Using the user benefits data and user profile from the ''perks_data''
+          state key,', analyze the information and provide structured insights., '**Your Task:**', '1. **Your Benefits**:
+          List the user benefits category wise(format: "Name - Category - Benefit Type - Benefit Value")', '2. **Your Bank
+          partners**: List of your bank''s partners', '**CRITICAL CONSTRAINTS:**', '- You must return a structured JSON response
+          that matches the PerksSummary schema exactly']
+      output_schema: PerksSummary
+      output_key: perks_summary
+      instance: formatting_agent
+  formatting_agent.2:
+    type: instance
+    models: [gemini-2.5-flash]
+    params:
+      name: portfolio_formatter
+      description: Analyzes user's portfolio data and generates structured financial insights
+      instruction: ['You are an expert financial analyst. Using the portfolio data and user profile from the ''portfolio_data''
+          state key,', analyze the information and provide structured insights., '**Your Task:**', '1. **Debts**: List user''s
+          debts (format: "Debt Type - Amount - Interest Rate")', '2. **Investments**: List user''s investments (format: "Investment
+          Type - Amount - Performance")', '3. **Net Worth**: List net worth calculations (format: "Assets - Liabilities =
+          Net Worth")', '4. **Cashflow**: List cashflow items (format: "Income Source/Expense - Amount - Frequency")', '5.
+          **Average Cashflow**: List average cashflow calculations (format: "Monthly Average - Yearly Projection")', '6. **Insights**:
+          Analyze portfolio health, investment performance, debt management, and alignment with user goals from their profile.',
+        '**CRITICAL CONSTRAINTS:**', '- You must return a structured JSON response that matches the PortfolioSummary schema
+          exactly', '- Base calculations on available portfolio data', '- Make insights specific and actionable based on the
+          user''s stated goals and financial position']
+      output_schema: PortfolioSummary
+      output_key: portfolio_summary
+      instance: formatting_agent
+  formatting_agent.3:
+    type: instance
+    models: [gemini-2.5-flash]
+    params:
+      name: spending_formatter
+      description: Analyzes spending data and generates structured financial insights
+      instruction: ['You are an expert financial analyst. Using the spending data and user profile from the ''spending_data''
+          state key,', analyze the information and provide structured insights., '**Your Task:**', '1. **Activities**: List
+          the 5 most recent transactions (format: "Date - Merchant - Amount")', '2. **Income**: Calculate total income from
+          transactions (look for payrolls, salary deposits, refunds, etc.)', '3. **Expenses**: Calculate total expenses from
+          transactions (purchases, bills, rent, groceries, etc.)', '4. **Insights**: Analyze spending patterns against the
+          user''s goals from their profile. Provide actionable insights about their financial behavior, potential savings
+          opportunities, or goal alignment.', '**CRITICAL CONSTRAINTS:**', '- You must return a structured JSON response that
+          matches the SpendingSummary schema exactly', '- Base income/expense calculations on transaction types and amounts',
+        '- Make insights specific and actionable based on the user''s stated goals']
+      output_schema: SpendingSummary
+      output_key: spending_summary
+      instance: formatting_agent
+  goals_agent:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [agent_tool]
+    params:
+      name: goals_specialist
+      description: Specialist agent for financial goals, savings targets, and future planning
+      instruction: [You are a financial goals specialist at Cymbal Bank. Your role is to answer any questions, 'made by the
+          user about their financial goals, savings targets, and future planning.', You are a proxy between the user and the
+          Cymbal bank services., '**Your Process:**', '1. **Understand the Request**: Analyze the user''s goals-related query',
+        '2. **Gather Information**: Use the cymbal_agent tool to retrieve user profile, current goals, and savings progress',
+        '3. **Ask Follow-up Questions**: If you need more details from the user (goal amounts, timelines, priorities), ask
+          clarifying questions', '4. **Multiple Queries**: Make additional calls to Cymbal services as needed to get complete
+          financial information', '5. **Provide Guidance**: Deliver comprehensive goal-setting advice and progress tracking',
+        Use the cymbal_agent tool to gather goal and savings data and provide detailed guidance. Ask the user for clarification
+          if needed.]
+      output_key: goals_response
+  perks_agent:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [agent_tool]
+    params:
+      name: perks_specialist
+      description: Specialist agent for banking perks, benefits, rewards, and account features
+      instruction: [You are a banking perks and benefits specialist at Cymbal Bank. Your role is to answer any questions,
+        'made by the user about banking perks, benefits, rewards, and account features.', You are a proxy between the user
+          and the Cymbal bank services., '**Your Process:**', '1. **Understand the Request**: Analyze the user''s perks-related
+          query', '2. **Gather Information**: Use the cymbal_agent tool to retrieve account details, benefit eligibility,
+          and rewards information', '3. **Ask Follow-up Questions**: If you need more details from the user (account type,
+          spending categories, preferences), ask clarifying questions', '4. **Multiple Queries**: Make additional calls to
+          Cymbal services as needed to get complete benefits information', '5. **Provide Guidance**: Deliver comprehensive
+          perks optimization and benefits maximization advice', Use the cymbal_agent tool to gather perks and benefits data
+          and provide detailed optimization advice. Ask the user for clarification if needed.]
+      output_key: perks_response
+  perks_snapshot_workflow:
+    type: instance
+    params:
+      name: perks_snapshot_pipeline
+      description: Executes a pre-decided pipeline. It retrieves benefits data and user profile, then generates structured
+        financial insights.
+      sub_agents: [retriever_agent, formatting_agent]
+  portfolio_agent:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [agent_tool]
+    params:
+      name: portfolio_specialist
+      description: Specialist agent for investment portfolios, performance analysis, and market insights
+      instruction: [You are an investment portfolio specialist at Cymbal Bank. Your role is to answer any questions, 'made
+          by the user about their investment portfolios, performance analysis, and market insights.', You are a proxy between
+          the user and the Cymbal bank services., '**Your Process:**', '1. **Understand the Request**: Analyze the user''s
+          portfolio-related query', '2. **Gather Information**: Use the cymbal_agent tool to retrieve portfolio data, investment
+          information, and performance metrics', '3. **Ask Follow-up Questions**: If you need more details from the user (time
+          periods, specific investments, risk preferences), ask clarifying questions', '4. **Multiple Queries**: Make additional
+          calls to Cymbal services as needed to get complete portfolio information', '5. **Provide Analysis**: Deliver comprehensive
+          investment analysis and portfolio recommendations', Use the cymbal_agent tool to gather portfolio data and provide
+          detailed investment insights. Ask the user for clarification if needed.]
+      output_key: portfolio_response
+  portfolio_snapshot_workflow:
+    type: instance
+    params:
+      name: portfolio_snapshot_pipeline
+      description: Executes a pre-decided pipeline. It retrieves portfolio data and user profile, then generates structured
+        financial insights.
+      sub_agents: [retriever_agent, formatting_agent]
+  retriever_agent.0:
+    type: instance
+    models: [gemini-2.5-pro]
+    params:
+      name: spending_retriever
+      description: Research is everything regarding the users current spending
+      instruction: ['You are an expert report architect. Using the research topic and the plan from the ''research_plan''
+          state key, design a logical structure for the final report.', 'Note: Ignore all the tag nanes ([MODIFIED], [NEW],
+          [RESEARCH], [DELIVERABLE]) in the research plan.', Your task is to create a markdown outline with 4-6 distinct sections
+          that cover the topic comprehensively without overlap., 'You can use any markdown format you prefer, but here''s
+          a suggested structure:', '# Section Name', A brief overview of what this section covers, Feel free to add subsections
+          or bullet points if needed to better organize the content., Make sure your outline is clear and easy to follow.,
+        Do not include a "References" or "Sources" section in your outline. Citations will be handled in-line.]
+      output_key: spending_data
+      instance: retriever_agent
+  retriever_agent.1:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [agent_tool]
+    params:
+      name: Advisors_retriever
+      description: An agent that retrieves the bank's advisors and user meetings
+      instruction: [You are a helpful financial assistant. Your goal is to gather user's meetings and list of advisors, '**Phase
+          1: Get list of meetings**', Call the bank_agent_wrapper tool with the query "List my meetings." to get the user's
+          scheduled meetings., '**Phase 2: Get list of bank''s advisors**', Call the bank_agent_wrapper tool with the query
+          "List the advisors." to get the advisors of the bank., '**Phase 3: Get User Profile**', Call the bank_agent_wrapper
+          tool with the query "Get my user profile" to get the user's profile information, 'Combine the meeting data, advisor
+          data and user profile information in your response for the next agent to use.']
+      output_key: Advisors_data
+      instance: retriever_agent
+  retriever_agent.2:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [agent_tool]
+    params:
+      name: perks_retriever
+      description: An agent that retrieves the bank's partners and user benefits for the requested period
+      instruction: [You are a helpful financial assistant. Your goal is to gather comprehensive user benefits data., '**Phase
+          1: Get Benefits Data**', Call the cymbal_agent tool with the query "List my benefits." to get the user's benefits.,
+        '**Phase 2: Get Bank Partners**', Call the cymbal_agent tool with the query "List the bank partners." to get the partners
+          of the bank., '**Phase 2: Get User Profile**', Call the cymbal_agent tool with the query "Get my user profile" to
+          get the user's profile information including their financial goals., Combine both the benefits data and user profile
+          information in your response for the next agent to use.]
+      output_key: perks_data
+      instance: retriever_agent
+  retriever_agent.3:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [agent_tool]
+    params:
+      name: portfolio_retriever
+      description: An agent that retrieves user portfolio data and profile information
+      instruction: [You are a helpful financial assistant. Your goal is to gather comprehensive portfolio data., '**Phase
+          1: Get Portfolio Data**', 'Call the cymbal_agent tool with the query "List my portfolio data including debts, investments,
+          and financial overview." to get the user''s portfolio information.', '**Phase 2: Get User Profile**', Call the cymbal_agent
+          tool with the query "Get my user profile" to get the user's profile information including their financial goals.,
+        Combine both the portfolio data and user profile information in your response for the next agent to use.]
+      output_key: portfolio_data
+      instance: retriever_agent
+  retriever_agent.4:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [agent_tool]
+    params:
+      name: spending_retriever
+      description: 'An agent that retrieves user transaction data and profile information for the requested period. '
+      instruction: [You are a helpful financial assistant. Your goal is to gather comprehensive spending and profile data.,
+        '**Phase 1: Get Transaction Data**', Call the cymbal_agent tool with the query "List my recent transactions." to get
+          the user's transaction history., '**Phase 2: Get User Profile**', Call the cymbal_agent tool with the query "Get
+          my user profile" to get the user's profile information including their financial goals., Combine both the transaction
+          data and user profile information in your response for the next agent to use.]
+      output_key: spending_data
+      instance: retriever_agent
+  spending_agent:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [agent_tool]
+    params:
+      name: spending_specialist
+      description: Specialist agent for spending analysis, transactions, budgeting, and expense management
+      instruction: [You are a spending and transaction specialist at Cymbal Bank. Your role is to answer any questions, 'made
+          by the user about their spending, transactions, budgets, and financial expenses.', You are a proxy between the user
+          and the Cymbal bank services., '**Your Process:**', '1. **Understand the Request**: Analyze the user''s spending-related
+          query', '2. **Gather Information**: Use the cymbal_agent tool to retrieve relevant transaction data, spending patterns,
+          and account information', '3. **Ask Follow-up Questions**: If you need more details from the user (time periods,
+          categories, etc.), ask clarifying questions', '4. **Multiple Queries**: Make additional calls to Cymbal services
+          as needed to get complete information', '5. **Provide Analysis**: Deliver comprehensive spending insights and recommendations',
+        Use the cymbal_agent tool to gather spending data and provide detailed analysis. Ask the user for clarification if
+          needed.]
+      output_key: spending_response
+  spending_snapshot_workflow.0:
+    type: instance
+    params:
+      name: research_pipeline
+      description: Executes a pre-approved research plan. It performs iterative research, evaluation, and composes a final,
+        cited report.
+      sub_agents: [retriever_agent, chart_agent]
+      instance: spending_snapshot_workflow
+  spending_snapshot_workflow.1:
+    type: instance
+    params:
+      name: spending_snapshot_pipeline
+      description: Executes a pre-decided pipeline. It retrieves transaction data and user profile, then generates structured
+        financial insights.
+      instance: spending_snapshot_workflow
+      sub_agents: [retriever_agent, formatting_agent]
+
+models:
+  gemini-2.5-flash:
+    type: literal
+    agents: [chart_agent, retriever_agent.1, formatting_agent.0, retriever_agent.2, formatting_agent.1, spending_agent, goals_agent,
+      portfolio_agent, perks_agent, advisors_agent, chat_orchestrator, retriever_agent.3, formatting_agent.2, retriever_agent.4,
+      formatting_agent.3]
+  gemini-2.5-flash-preview-04-17:
+    type: literal
+    agents: [adk_agent, agent.create_agent.1]
+  gemini-2.5-pro:
+    type: literal
+    agents: [retriever_agent.0]
+
+tools:
+  agent_tool:
+    type: agent
+    agents: [chart_agent, retriever_agent.1, retriever_agent.2, spending_agent, goals_agent, portfolio_agent, perks_agent,
+      advisors_agent, retriever_agent.3, retriever_agent.4]
+    params:
+      wrapper: AgentTool
+  book_pickleball_court:
+    type: function
+    agents: [adk_agent]
+    params:
+      description: |-
+        Books a pickleball court for a given date and time range under a reservation name.
+
+        Args:
+            date: The date of the reservation, in YYYY-MM-DD format.
+            start_time: The start time of the reservation, in HH:MM format.
+            end_time: The end time of the reservation, in HH:MM format.
+            reservation_name: The name for the reservation.
+
+        Returns:
+            A dictionary confirming the booking or providing an error.
+  get_availability:
+    type: function
+    agents: [agent.create_agent.1]
+    params:
+      description: |-
+        Checks Karley's availability for a given date range.
+
+        Args:
+            start_date: The start of the date range to check, in YYYY-MM-DD format.
+            end_date: The end of the date range to check, in YYYY-MM-DD format.
+
+        Returns:
+            A string listing Karley's available times for that date range.
+  list_court_availabilities:
+    type: function
+    agents: [adk_agent]
+    params:
+      description: |-
+        Lists the available and booked time slots for a pickleball court on a given date.
+
+        Args:
+            date: The date to check, in YYYY-MM-DD format.
+
+        Returns:
+            A dictionary with the status and the detailed schedule for the day.
+  send_message:
+    type: function
+    agents: [adk_agent]
+    params:
+      module: self.send_message
+      description: Sends a task to a remote friend agent.
+
+teams:
+  advisors_snapshot_workflow:
+    type: sequential
+    agents: [advisors_snapshot_workflow, retriever_agent, formatting_agent]
+  chat_orchestrator:
+    type: hierarchy
+    agents: [chat_orchestrator, spending_agent, goals_agent, portfolio_agent, perks_agent, advisors_agent]
+  perks_snapshot_workflow:
+    type: sequential
+    agents: [perks_snapshot_workflow, retriever_agent, formatting_agent]
+  portfolio_snapshot_workflow:
+    type: sequential
+    agents: [portfolio_snapshot_workflow, retriever_agent, formatting_agent]
+  spending_snapshot_workflow:
+    type: sequential
+    agents: [spending_snapshot_workflow, retriever_agent, chart_agent]
+  spending_snapshot_workflow.1:
+    type: sequential
+    agents: [spending_snapshot_workflow.1, retriever_agent, formatting_agent]
+
+imports:
+  A2ACardResolver: a2a.client.A2ACardResolver
+  A2AClient: a2a.client.A2AClient
+  A2AStarletteApplication: a2a.server.apps.A2AStarletteApplication
+  Agent: google.adk.Agent
+  AgentCapabilities: a2a.types.AgentCapabilities
+  AgentCard: a2a.types.AgentCard
+  AgentExecutor: a2a.server.agent_execution.AgentExecutor
+  AgentSkill: a2a.types.AgentSkill
+  AgentTool: google.adk.tools.agent_tool.AgentTool
+  AIMessage: langchain_core.messages.AIMessage
+  Any: typing.Any
+  asyncio: asyncio
+  AsyncIterable: typing.AsyncIterable
+  bank_agent_wrapper: cymbal_agent_wrapper.bank_agent_wrapper
+  BaseModel: pydantic.BaseModel
+  book_pickleball_court: pickleball_tools.book_pickleball_court
+  Callable: typing.Callable
+  ChatGoogleGenerativeAI: langchain_google_genai.ChatGoogleGenerativeAI
+  create_agent: agent.create_agent
+  create_react_agent: langgraph.prebuilt.create_react_agent
+  date: datetime.date
+  datetime: datetime.datetime
+  DefaultRequestHandler: a2a.server.request_handlers.DefaultRequestHandler
+  Dict: typing.Dict
+  EventQueue: a2a.server.events.EventQueue
+  Field: pydantic.Field
+  httpx: httpx
+  InMemoryArtifactService: google.adk.artifacts.InMemoryArtifactService
+  InMemoryMemoryService: google.adk.memory.in_memory_memory_service.InMemoryMemoryService
+  InMemoryPushNotifier: a2a.server.tasks.InMemoryPushNotifier
+  InMemorySessionService: google.adk.sessions.InMemorySessionService
+  InMemoryTaskStore: a2a.server.tasks.InMemoryTaskStore
+  InternalError: a2a.types.InternalError
+  InvalidParamsError: a2a.types.InvalidParamsError
+  json: json
+  KaitlynAgent: app.agent.KaitlynAgent
+  KaitlynAgentExecutor: app.agent_executor.KaitlynAgentExecutor
+  KarleyAgentExecutor: agent_executor.KarleyAgentExecutor
+  List: typing.List
+  list_court_availabilities: pickleball_tools.list_court_availabilities
+  Literal: typing.Literal
+  LlmAgent: google.adk.agents.LlmAgent
+  load_dotenv: dotenv.load_dotenv
+  logging: logging
+  MemorySaver: langgraph.checkpoint.memory.MemorySaver
+  MessageSendParams: a2a.types.MessageSendParams
+  nest_asyncio: nest_asyncio
+  os: os
+  Part: a2a.types.Part
+  random: random
+  ReadonlyContext: google.adk.agents.readonly_context.ReadonlyContext
+  RemoteA2aAgent: google.adk.agents.remote_a2a_agent.RemoteA2aAgent
+  RemoteAgentConnections: remote_agent_connection.RemoteAgentConnections
+  RequestContext: a2a.server.agent_execution.RequestContext
+  root_agent: agent.root_agent
+  RunnableConfig: langchain_core.runnables.RunnableConfig
+  Runner: google.adk.runners.Runner
+  SchedulingAgent: agent.SchedulingAgent
+  SchedulingAgentExecutor: agent_executor.SchedulingAgentExecutor
+  SendMessageRequest: a2a.types.SendMessageRequest
+  SendMessageResponse: a2a.types.SendMessageResponse
+  SendMessageSuccessResponse: a2a.types.SendMessageSuccessResponse
+  SequentialAgent: google.adk.agents.SequentialAgent
+  ServerError: a2a.utils.errors.ServerError
+  sys: sys
+  Task: a2a.types.Task
+  TaskArtifactUpdateEvent: a2a.types.TaskArtifactUpdateEvent
+  TaskState: a2a.types.TaskState
+  TaskStatusUpdateEvent: a2a.types.TaskStatusUpdateEvent
+  TaskUpdater: a2a.server.tasks.TaskUpdater
+  TextPart: a2a.types.TextPart
+  timedelta: datetime.timedelta
+  tool: langchain_core.tools.tool
+  ToolContext: google.adk.tools.tool_context.ToolContext
+  ToolMessage: langchain_core.messages.ToolMessage
+  types: google.genai.types
+  UnsupportedOperationError: a2a.types.UnsupportedOperationError
+  uuid: uuid
+  uvicorn: uvicorn
+
+functions:
+  __init__:
+    type: sync
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.agent
+    args: [self]
+  _async_init_components:
+    type: async
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.agent
+    args: [self, remote_agent_addresses]
+  _async_main:
+    type: async
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.agent
+  _get_initialized_host_agent_sync:
+    type: sync
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.agent
+  _validate_request:
+    type: sync
+    module: refs.a2a_friend_scheduling.nate_agent_crewai.agent_executor
+    args: [self, context]
+    params:
+      returns: bool
+  book_pickleball_court:
+    type: sync
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.pickleball_tools
+    args: [date, start_time, end_time, reservation_name]
+    params:
+      returns: dict
+  cancel:
+    type: async
+    module: refs.a2a_friend_scheduling.kaitlynn_agent_langgraph.app.agent_executor
+    args: [self, context, event_queue]
+    params:
+      returns: None
+  create:
+    type: async
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.agent
+    args: [cls, remote_agent_addresses]
+  create_agent:
+    type: sync
+    module: refs.a2a_friend_scheduling.karley_agent_adk.agent
+    params:
+      returns: LlmAgent
+  execute:
+    type: async
+    module: refs.a2a_friend_scheduling.kaitlynn_agent_langgraph.app.agent_executor
+    args: [self, context, event_queue]
+    params:
+      returns: None
+  generate_court_schedule:
+    type: sync
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.pickleball_tools
+  generate_kaitlyns_calendar:
+    type: sync
+    module: refs.a2a_friend_scheduling.kaitlynn_agent_langgraph.app.agent
+    params:
+      returns: dict
+  generate_karley_calendar:
+    type: sync
+    module: refs.a2a_friend_scheduling.karley_agent_adk.agent
+    params:
+      returns: dict
+  get_agent:
+    type: sync
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.remote_agent_connection
+    args: [self]
+    params:
+      returns: AgentCard
+  get_agent_response:
+    type: sync
+    module: refs.a2a_friend_scheduling.kaitlynn_agent_langgraph.app.agent
+    args: [self, config]
+  get_availability:
+    type: sync
+    module: refs.a2a_friend_scheduling.karley_agent_adk.agent
+    args: [start_date, end_date]
+    params:
+      returns: str
+  invoke:
+    type: sync
+    module: refs.a2a_friend_scheduling.kaitlynn_agent_langgraph.app.agent
+    args: [self, query, context_id]
+  list_court_availabilities:
+    type: sync
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.pickleball_tools
+    args: [date]
+    params:
+      returns: dict
+  main:
+    type: sync
+    module: refs.a2a_friend_scheduling.kaitlynn_agent_langgraph.app.__main__
+  root_instruction:
+    type: sync
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.agent
+    args: [self, context]
+    params:
+      returns: str
+  send_message:
+    type: async
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.agent
+    args: [self, agent_name, task, tool_context]
+  stream:
+    type: async
+    module: refs.a2a_friend_scheduling.host_agent_adk.host.agent
+    args: [self, query, session_id]
+    params:
+      returns: AsyncIterable[dict]
+
+variables:
+  GOOGLE_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [refs.a2a_friend_scheduling.nate_agent_crewai.__main__, refs.a2a_friend_scheduling.karley_agent_adk.__main__,
+        refs.a2a_friend_scheduling.kaitlynn_agent_langgraph.app.__main__]
+  GOOGLE_GENAI_USE_VERTEXAI:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [refs.a2a_friend_scheduling.karley_agent_adk.__main__]
+  HOST_OVERRIDE:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [refs.a2a_friend_scheduling.nate_agent_crewai.__main__]
+
+networks:
+  agent.ai-agent-bakeoff.com:
+    type: api
+    actions: [GET]
+    urls: [/.well-known/agent-card.json]
+    protocols: [https]
+    ports: ["443"]
+    params:
+      links: [agent_card]
+  agent_card:
+    type: api
+    actions: [GET]
+    protocols: [http]
+    ports: ["80"]
+    params:
+      caller: [main]
+      pattern: http://{host}:{port}/
